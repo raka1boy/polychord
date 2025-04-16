@@ -1,0 +1,15 @@
+.{
+    .name = "polychord",
+    .version = "0.0.0",
+    .dependencies = .{
+        .@"zig-portaudio" = .{
+            .url = "git+https://github.com/fjebaker/zaudio.git#8d43812c910319b2bc6254723c5ca922a87fa985",
+            .hash = "1220e96c59de285fea5b44374713c6c0e56ce7dbd2deca72e97c6c5420865e4fad53",
+        },
+    },
+    .paths = .{
+        "build.zig",
+        "build.zig.zon",
+        "src",
+    },
+}
