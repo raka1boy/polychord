@@ -27,11 +27,7 @@ pub fn build(b: *std.Build) void {
         .root_module = exe_mod,
     });
     const zaudio = b.dependency("zig-portaudio", .{ .target = target, .optimize = optimize });
-    var it = zaudio.builder.modules.iterator();
-    while (it.next()) |mod| {
-        std.debug.print("ssss{any}\n", .{mod.value_ptr.*.export_symbol_names});
-    }
-    //exe.root_module.addImport("zaudio", zaudio.module("zaudio"));
+    exe.root_module.addImport("zaudio", zaudio.module("zaudio"));
     // b.dependency("zaudio", .{});
     b.installArtifact(exe);
     const run_cmd = b.addRunArtifact(exe);
