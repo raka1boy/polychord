@@ -13,6 +13,10 @@ pub fn build(b: *std.Build) void {
         .target = target,
         .optimize = optimize,
     });
+    const portaudio_dep = b.dependency("portaudio", .{
+        .target = target,
+        .optimize = optimize,
+    });
 
     exe_mod.addImport("polychord_lib", lib_mod);
     const lib = b.addLibrary(.{
@@ -26,9 +30,7 @@ pub fn build(b: *std.Build) void {
         .name = "polychord",
         .root_module = exe_mod,
     });
-    const zaudio = b.dependency("zig-portaudio", .{ .target = target, .optimize = optimize });
-    exe.root_module.addImport("zaudio", zaudio.module("zaudio"));
-    // b.dependency("zaudio", .{});
+    exe.linkLibrary(portaudio_dep.artifact("portaudio"));
     b.installArtifact(exe);
     const run_cmd = b.addRunArtifact(exe);
     run_cmd.step.dependOn(b.getInstallStep());

@@ -2,9 +2,9 @@
     .name = "polychord",
     .version = "0.0.0",
     .dependencies = .{
-        .@"zig-portaudio" = .{
-            .url = "git+https://github.com/fjebaker/zaudio.git#8d43812c910319b2bc6254723c5ca922a87fa985",
-            .hash = "1220e83b0e61bd79e3ca753fb27c6db94ef5df9edfbd4862cc678f99b3ca8db0918a",
+        .portaudio = .{
+            .url = "git+https://github.com/allyourcodebase/portaudio?ref=main#5beb53da11a9fcd01cb5f30f0375c845f0acc4be",
+            .hash = "1220e96c59de285fea5b44374713c6c0e56ce7dbd2deca72e97c6c5420865e4fad53",
         },
     },
     .paths = .{
