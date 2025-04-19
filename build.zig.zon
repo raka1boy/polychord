@@ -6,6 +6,11 @@
             .url = "git+https://github.com/allyourcodebase/portaudio?ref=main#5beb53da11a9fcd01cb5f30f0375c845f0acc4be",
             .hash = "1220e96c59de285fea5b44374713c6c0e56ce7dbd2deca72e97c6c5420865e4fad53",
         },
+        .Zeys = .{
+            .url = "https://github.com/rullo24/Zeys/archive/refs/tags/v1.1.0.tar.gz",
+            .hash = "1220e2608150f5e83773561737bc4d91bf326c45b727451800d04b89a89f9c3b5ee4",
+        },
+        //https://github.com/zxvnme/zgui?ysclid=m9ocdgm0on498990909 i want it i got it
     },
     .paths = .{
         "build.zig",
