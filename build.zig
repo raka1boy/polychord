@@ -2,7 +2,8 @@ const std = @import("std");
 
 pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
-    const optimize = b.standardOptimizeOption(.{ .preferred_optimize_mode = .ReleaseFast });
+    const optimize = b.standardOptimizeOption(.{});
+
     const lib_mod = b.createModule(.{
         .root_source_file = b.path("src/root.zig"),
         .target = target,
@@ -17,26 +18,20 @@ pub fn build(b: *std.Build) void {
         .target = target,
         .optimize = optimize,
     });
-
+    const sdl_dep = b.dependency("SDL", .{});
     const zeys = b.dependency("Zeys", .{
         .target = target,
         .optimize = optimize,
     });
-
-    exe_mod.addImport("polychord_lib", lib_mod);
-    const lib = b.addLibrary(.{
-        .linkage = .static,
-        .name = "polychord",
-        .root_module = lib_mod,
-    });
-
-    b.installArtifact(lib);
     const exe = b.addExecutable(.{
         .name = "polychord",
         .root_module = exe_mod,
     });
+    exe_mod.linkLibrary(sdl_dep.artifact("SDL2"));
+
     exe.root_module.addImport("zeys", zeys.module("zeys"));
     exe.linkLibrary(portaudio_dep.artifact("portaudio"));
+    exe.linkLibC();
     b.installArtifact(exe);
     const run_cmd = b.addRunArtifact(exe);
     run_cmd.step.dependOn(b.getInstallStep());

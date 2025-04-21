@@ -1,5 +1,6 @@
 .{
-    .name = "polychord",
+    .fingerprint = 0x4b07ffad9f7e3f9c,
+    .name = .polychord,
     .version = "0.0.0",
     .dependencies = .{
         .portaudio = .{
@@ -11,6 +12,10 @@
             .hash = "1220e2608150f5e83773561737bc4d91bf326c45b727451800d04b89a89f9c3b5ee4",
         },
         //https://github.com/zxvnme/zgui?ysclid=m9ocdgm0on498990909 i want it i got it
+        .SDL = .{
+            .url = "git+https://github.com/allyourcodebase/SDL#181dd2c6a69a8392a8457a5e80e3ab2e4871e643",
+            .hash = "SDL-2.32.4-JToi30-TEgH42-HFmgINmgFPrAXOjaNp734Jh_wep6ZN",
+        },
     },
     .paths = .{
         "build.zig",
