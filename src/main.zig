@@ -13,11 +13,11 @@ pub fn main() !void {
     try harmonicgroup.addHarmonic(harmonic);
     try synth.groups.append(harmonicgroup);
 
-    var harmonicgroup2: synthes.HarmonicGroup(chunksz) = .init(alloc, 22);
-    defer harmonicgroup2.deinit();
-    const harmonic2: synthes.Harmonic(chunksz) = .init(2);
-    try harmonicgroup2.addHarmonic(harmonic2);
-    try synth.groups.append(harmonicgroup2);
+    // var harmonicgroup2: synthes.HarmonicGroup(chunksz) = .init(alloc, 22);
+    // defer harmonicgroup2.deinit();
+    // const harmonic2: synthes.Harmonic(chunksz) = .init(2);
+    // try harmonicgroup2.addHarmonic(harmonic2);
+    // try synth.groups.append(harmonicgroup2);
 
     // var harmonicgroup3: synthes.HarmonicGroup(chunksz) = .init(alloc, 7);
     // defer harmonicgroup3.deinit();
