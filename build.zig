@@ -14,24 +14,16 @@ pub fn build(b: *std.Build) void {
         .target = target,
         .optimize = optimize,
     });
-    const portaudio_dep = b.dependency("portaudio", .{
-        .target = target,
-        .optimize = optimize,
-    });
     const sdl_dep = b.dependency("SDL", .{});
-    const zeys = b.dependency("Zeys", .{
-        .target = target,
-        .optimize = optimize,
-    });
     const exe = b.addExecutable(.{
         .name = "polychord",
         .root_module = exe_mod,
     });
     exe_mod.linkLibrary(sdl_dep.artifact("SDL2"));
 
-    exe.root_module.addImport("zeys", zeys.module("zeys"));
-    exe.linkLibrary(portaudio_dep.artifact("portaudio"));
     exe.linkLibC();
+    exe.bundle_compiler_rt = true;
+    exe.bundle_ubsan_rt = true;
     b.installArtifact(exe);
     const run_cmd = b.addRunArtifact(exe);
     run_cmd.step.dependOn(b.getInstallStep());

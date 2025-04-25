@@ -4,8 +4,8 @@ pub fn Harmonic(chunk_size: comptime_int) type {
         multiplier: f32,
         amp: f64 = 0.0, // Changed to f64
         phase: f64 = 0.0,
-        onset_amp_smooth: f32 = 0.01,
-        offset_amp_smooth: f32 = 0.01,
+        onset_amp_smooth: f32 = 0.1,
+        offset_amp_smooth: f32 = 0.03,
         is_active: bool = false,
         last_active_frequency: f64 = 0.0,
         current_frequency: f64 = 0.0,
@@ -13,11 +13,12 @@ pub fn Harmonic(chunk_size: comptime_int) type {
         snap: ?u8 = null,
         ramp_step: f64 = 1, // Changed to f64
 
-        pub fn init(mul: f32) This {
+        pub fn init(mul: f32, amp: f64) This {
             var xoro = std.Random.Xoroshiro128.init(@intCast(std.time.microTimestamp()));
             const rand = xoro.random();
             return .{
                 .multiplier = mul,
+                .amp = amp,
                 .phase = std.math.pi * 2.0 * rand.float(f32), // Random phase
             };
         }
@@ -33,14 +34,12 @@ pub fn Harmonic(chunk_size: comptime_int) type {
             } else {
                 actual_freq = @as(f64, @floatFromInt(initial_frequency)) * self.multiplier;
             }
-
             if (self.is_active) {
                 self.current_frequency = actual_freq;
                 self.amp = @min(1, self.amp + self.onset_amp_smooth);
             } else {
                 self.amp = @max(0, self.amp - self.offset_amp_smooth);
             }
-            std.debug.print("FREQ: {d}\n", .{self.current_frequency});
             const angular_freq = 2.0 * std.math.pi * self.current_frequency;
             const sample_rate_f64 = @as(f64, @floatFromInt(sample_rate));
             const phase_inc = angular_freq / sample_rate_f64;
@@ -89,8 +88,8 @@ pub fn Synthesizer(sample_rate: comptime_int, chunk_size: comptime_int) !type {
         groups: std.ArrayList(HarmonicGroup(chunk_size)),
         global_smoothing: f32 = 0.0,
         device: c.SDL_AudioDeviceID = undefined,
-        min_freq: u16 = 256,
-        max_freq: u16 = 1024,
+        min_freq: u16 = 131,
+        max_freq: u16 = 1047,
 
         pub fn init(alloc: std.mem.Allocator) !This {
             return .{
@@ -134,24 +133,18 @@ pub fn Synthesizer(sample_rate: comptime_int, chunk_size: comptime_int) !type {
             @memset(output[0..chunk_size], 0.0);
             for (self.groups.items) |*group| {
                 const is_group_active = self.state.keys_pressed[@intCast(group.key)] != 0;
-                var group_buffer: [chunk_size]f32 = undefined;
-                @memset(&group_buffer, 0.0);
                 for (group.harmonics.items) |*harmonic| {
                     harmonic.setActive(is_group_active);
                     var temp_buffer: [chunk_size]f32 = undefined;
                     harmonic.generateSineWave(&temp_buffer, @intFromFloat(base_frequency), base_amp, sample_rate);
                     for (0..chunk_size) |i| {
-                        group_buffer[i] += temp_buffer[i];
+                        output[i] += temp_buffer[i];
                     }
                 }
-
-                for (0..chunk_size) |i| {
-                    output[i] += group_buffer[i];
-                }
             }
-            for (0..chunk_size) |i| {
-                output[i] = std.math.tanh(output[i]);
-            }
+            // for (0..chunk_size) |i| {
+            //     output[i] = std.math.tanh(output[i]);
+            // }
         }
     };
 }
@@ -177,6 +170,5 @@ const StateManager = @import("state.zig").InputState;
 const std = @import("std");
 const math = std.math;
 const c = @cImport({
-    @cInclude("portaudio.h");
     @cInclude("SDL2/SDL.h");
 });
