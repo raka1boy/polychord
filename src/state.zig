@@ -16,18 +16,17 @@ pub const InputState = struct {
     }
     pub fn advance(self: *InputState) void {
         _ = c.SDL_GetMouseState(&self.mouse_pos[0], &self.mouse_pos[1]);
-        for (0..512) |i| {
-            if (self.keys_pressed[i] != 0) {
-                std.debug.print("key pressed: {d}\n", .{i});
-            }
-        }
+        // for (0..512) |i| {
+        //     if (self.keys_pressed[i] != 0) {
+        //         std.debug.print("key pressed: {d}\n", .{i});
+        //     }
+        // }
         _ = c.SDL_PollEvent(&self.currentEvent);
         c.SDL_GetWindowSize(self.window, &self.screen_x, &self.screen_y);
         c.SDL_PumpEvents();
     }
 };
 
-//const sdl = @import("SDL2");
 const std = @import("std");
 const c = @cImport({
     @cInclude("SDL2/SDL.h");

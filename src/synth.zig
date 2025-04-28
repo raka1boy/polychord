@@ -3,15 +3,14 @@ pub fn Harmonic(chunk_size: comptime_int) type {
         const This = @This();
         multiplier: f32,
         amp: f64 = 0.0, // Changed to f64
+        global_amp: f32 = 1.0,
         phase: f64 = 0.0,
         onset_amp_smooth: f32 = 0.1,
         offset_amp_smooth: f32 = 0.03,
         is_active: bool = false,
         last_active_frequency: f64 = 0.0,
         current_frequency: f64 = 0.0,
-        sample_rate: usize = 0,
         snap: ?u8 = null,
-        ramp_step: f64 = 1, // Changed to f64
 
         pub fn init(mul: f32, amp: f64) This {
             var xoro = std.Random.Xoroshiro128.init(@intCast(std.time.microTimestamp()));
@@ -30,7 +29,7 @@ pub fn Harmonic(chunk_size: comptime_int) type {
         pub fn generateSineWave(self: *This, buffer: *[chunk_size]f32, initial_frequency: u16, external_amp: f64, sample_rate: usize) void {
             var actual_freq: f64 = 0;
             if (self.snap) |snap_val| {
-                actual_freq = closestETFreq(@floatFromInt(snap_val), @as(f64, @floatFromInt(initial_frequency)) * self.multiplier);
+                actual_freq = hz_stuff.closestETFreq(@floatFromInt(snap_val), @as(f64, @floatFromInt(initial_frequency)) * self.multiplier);
             } else {
                 actual_freq = @as(f64, @floatFromInt(initial_frequency)) * self.multiplier;
             }
@@ -46,7 +45,7 @@ pub fn Harmonic(chunk_size: comptime_int) type {
 
             for (0..chunk_size) |i| {
                 const phase = self.phase + phase_inc * @as(f64, @floatFromInt(i));
-                buffer[i] = @floatCast(external_amp * (self.amp * std.math.sin(phase))); // Cast f64 to f32
+                buffer[i] = @floatCast(external_amp * (self.global_amp * (self.amp * std.math.sin(phase)))); // Cast f64 to f32
             }
             self.phase += phase_inc * @as(f64, @floatFromInt(chunk_size));
             self.phase = @mod(self.phase, 2.0 * std.math.pi);
@@ -89,7 +88,7 @@ pub fn Synthesizer(sample_rate: comptime_int, chunk_size: comptime_int) !type {
         global_smoothing: f32 = 0.0,
         device: c.SDL_AudioDeviceID = undefined,
         min_freq: u16 = 131,
-        max_freq: u16 = 1047,
+        max_freq: u16 = 2094,
 
         pub fn init(alloc: std.mem.Allocator) !This {
             return .{
@@ -113,6 +112,36 @@ pub fn Synthesizer(sample_rate: comptime_int, chunk_size: comptime_int) !type {
             c.SDL_PauseAudioDevice(this.device, 0);
         }
 
+        pub fn genGroupWithRule(
+            self: *This,
+            trigger_key: SdlKeycodes,
+            advancementFunc: fn (initmul: *f32, initamp: *f32, initonset: *f32, initoffset: *f32) void,
+            initMul: f32,
+            initAmp: f32,
+            onsetSmoothInit: f32,
+            offsetSmoothInit: f32,
+            snapRule: ?u8,
+            count: usize,
+        ) !void {
+            var group = HarmonicGroup(chunk_size).init(self.allocator, @intFromEnum(trigger_key));
+            var ampAccum = initAmp;
+            var mulAccum = initMul;
+            var onsetAccum = onsetSmoothInit;
+            var offsetAccum = offsetSmoothInit;
+            for (0..count) |_| {
+                const harmonic = Harmonic(chunk_size){
+                    .multiplier = mulAccum,
+                    .global_amp = ampAccum,
+                    .onset_amp_smooth = onsetAccum,
+                    .offset_amp_smooth = offsetAccum,
+                    .snap = snapRule,
+                };
+                try group.harmonics.append(harmonic);
+                advancementFunc(&mulAccum, &ampAccum, &onsetAccum, &offsetAccum);
+            }
+            try self.groups.append(group);
+        }
+
         pub fn deinit(self: *This) void {
             c.SDL_CloseAudioDevice(self.device);
             self.groups.deinit();
@@ -128,7 +157,7 @@ pub fn Synthesizer(sample_rate: comptime_int, chunk_size: comptime_int) !type {
             const mouse_y: f64 = @floatFromInt(self.state.mouse_pos[1]);
             const base_amp: f64 = 1 - (mouse_y / @as(f64, @floatFromInt(self.state.screen_y)));
 
-            const base_frequency = logScale(mouse_x, 1920, @floatFromInt(self.min_freq), @floatFromInt(self.max_freq));
+            const base_frequency = hz_stuff.logScale(mouse_x, 1920, @floatFromInt(self.min_freq), @floatFromInt(self.max_freq));
 
             @memset(output[0..chunk_size], 0.0);
             for (self.groups.items) |*group| {
@@ -142,30 +171,12 @@ pub fn Synthesizer(sample_rate: comptime_int, chunk_size: comptime_int) !type {
                     }
                 }
             }
-            // for (0..chunk_size) |i| {
-            //     output[i] = std.math.tanh(output[i]);
-            // }
         }
     };
 }
 
-pub fn closestETFreq(notes_in_octave: f64, hertz: f64) f64 {
-    if (hertz <= 0.0) return 0.0;
-    const reference_freq = 440.0; // A4
-    const steps = notes_in_octave * math.log2(hertz / reference_freq);
-    const rounded_steps = math.round(steps);
-    return reference_freq * math.pow(f64, 2.0, rounded_steps / notes_in_octave);
-}
-
-pub fn logScale(cursor_x: f32, screen_width: f32, min_freq: f32, max_freq: f32) f32 {
-    const clamped_x = @min(@max(cursor_x, 0), screen_width);
-    const normalized = clamped_x / screen_width;
-    const log_min = @log(min_freq);
-    const log_max = @log(max_freq);
-    const log_freq = log_min + normalized * (log_max - log_min);
-    return @exp(log_freq);
-}
-
+const SdlKeycodes = @import("sdl_keycodes.zig").SdlKeycodes;
+const hz_stuff = @import("freq_stuff.zig");
 const StateManager = @import("state.zig").InputState;
 const std = @import("std");
 const math = std.math;
