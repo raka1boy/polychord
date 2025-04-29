@@ -5,6 +5,7 @@ pub const InputState = struct {
     currentEvent: c.SDL_Event = undefined,
     screen_x: c_int = 1920,
     screen_y: c_int = 1080,
+    is_playing_mode: bool = true,
     pub fn init() InputState {
         _ = c.SDL_Init(c.SDL_INIT_EVENTS | c.SDL_INIT_VIDEO | c.SDL_INIT_AUDIO);
 

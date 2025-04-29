@@ -10,7 +10,7 @@ pub fn Harmonic(chunk_size: comptime_int) type {
         is_active: bool = false,
         last_active_frequency: f64 = 0.0,
         current_frequency: f64 = 0.0,
-        snap: ?u8 = null,
+        snap: u8 = 0, //if 0 then no snapping
 
         pub fn init(mul: f32, amp: f64) This {
             var xoro = std.Random.Xoroshiro128.init(@intCast(std.time.microTimestamp()));
@@ -28,8 +28,8 @@ pub fn Harmonic(chunk_size: comptime_int) type {
 
         pub fn generateSineWave(self: *This, buffer: *[chunk_size]f32, initial_frequency: u16, external_amp: f64, sample_rate: usize) void {
             var actual_freq: f64 = 0;
-            if (self.snap) |snap_val| {
-                actual_freq = hz_stuff.closestETFreq(@floatFromInt(snap_val), @as(f64, @floatFromInt(initial_frequency)) * self.multiplier);
+            if (self.snap != 0) {
+                actual_freq = hz_stuff.closestETFreq(@floatFromInt(self.snap), @as(f64, @floatFromInt(initial_frequency)) * self.multiplier);
             } else {
                 actual_freq = @as(f64, @floatFromInt(initial_frequency)) * self.multiplier;
             }
@@ -120,7 +120,7 @@ pub fn Synthesizer(sample_rate: comptime_int, chunk_size: comptime_int) !type {
             initAmp: f32,
             onsetSmoothInit: f32,
             offsetSmoothInit: f32,
-            snapRule: ?u8,
+            snapRule: u8,
             count: usize,
         ) !void {
             var group = HarmonicGroup(chunk_size).init(self.allocator, @intFromEnum(trigger_key));
@@ -151,6 +151,7 @@ pub fn Synthesizer(sample_rate: comptime_int, chunk_size: comptime_int) !type {
             _ = len;
             var output: [*]f32 = @ptrCast(@alignCast(output_buf));
             const self: *This = @ptrCast(@alignCast(userdata.?));
+            if (!self.state.is_playing_mode) return;
             self.state.advance();
 
             const mouse_x = @as(f32, @floatFromInt(self.state.mouse_pos[0]));
