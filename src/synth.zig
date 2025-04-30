@@ -35,20 +35,31 @@ pub fn Harmonic(chunk_size: comptime_int) type {
             }
             if (self.is_active) {
                 self.current_frequency = actual_freq;
-                self.amp = @min(1, self.amp + self.onset_amp_smooth);
-            } else {
-                self.amp = @max(0, self.amp - self.offset_amp_smooth);
             }
+            const target_amp = if (self.is_active)
+                @min(1.0, self.amp + self.onset_amp_smooth)
+            else
+                @max(0.0, self.amp - self.offset_amp_smooth);
+            const amp_increment = (target_amp - self.amp) / @as(f64, @floatFromInt(chunk_size));
+
             const angular_freq = 2.0 * std.math.pi * self.current_frequency;
             const sample_rate_f64 = @as(f64, @floatFromInt(sample_rate));
             const phase_inc = angular_freq / sample_rate_f64;
 
             for (0..chunk_size) |i| {
+                const current_amp = self.amp + amp_increment * @as(f64, @floatFromInt(i));
                 const phase = self.phase + phase_inc * @as(f64, @floatFromInt(i));
-                buffer[i] = @floatCast(external_amp * (self.global_amp * (self.amp * std.math.sin(phase)))); // Cast f64 to f32
+                buffer[i] = @floatCast(external_amp * (self.global_amp * (current_amp * std.math.sin(phase))));
             }
+
             self.phase += phase_inc * @as(f64, @floatFromInt(chunk_size));
             self.phase = @mod(self.phase, 2.0 * std.math.pi);
+            self.amp = target_amp;
+
+            // Clamp near-zero amplitudes to prevent denormals
+            if (self.amp < 1e-6) {
+                self.amp = 0.0;
+            }
         }
     };
 }
@@ -111,35 +122,39 @@ pub fn Synthesizer(sample_rate: comptime_int, chunk_size: comptime_int) !type {
             this.device = c.SDL_OpenAudioDevice(null, 0, &want, null, 0);
             c.SDL_PauseAudioDevice(this.device, 0);
         }
-
         pub fn genGroupWithRule(
             self: *This,
-            trigger_key: SdlKeycodes,
+            trigger_keys: []const SdlKeycodes,
             advancementFunc: fn (initmul: *f32, initamp: *f32, initonset: *f32, initoffset: *f32) void,
             initMul: f32,
             initAmp: f32,
             onsetSmoothInit: f32,
             offsetSmoothInit: f32,
             snapRule: u8,
+            multiplierAdvanceBetweenKeys: f32,
             count: usize,
         ) !void {
-            var group = HarmonicGroup(chunk_size).init(self.allocator, @intFromEnum(trigger_key));
-            var ampAccum = initAmp;
-            var mulAccum = initMul;
-            var onsetAccum = onsetSmoothInit;
-            var offsetAccum = offsetSmoothInit;
-            for (0..count) |_| {
-                const harmonic = Harmonic(chunk_size){
-                    .multiplier = mulAccum,
-                    .global_amp = ampAccum,
-                    .onset_amp_smooth = onsetAccum,
-                    .offset_amp_smooth = offsetAccum,
-                    .snap = snapRule,
-                };
-                try group.harmonics.append(harmonic);
-                advancementFunc(&mulAccum, &ampAccum, &onsetAccum, &offsetAccum);
+            var mulAdvAccum: f32 = 0;
+            for (trigger_keys) |key| {
+                var group = HarmonicGroup(chunk_size).init(self.allocator, @intFromEnum(key));
+                var ampAccum = initAmp;
+                var mulAccum: f32 = initMul + mulAdvAccum;
+                var onsetAccum = onsetSmoothInit;
+                var offsetAccum = offsetSmoothInit;
+                for (0..count) |_| {
+                    const harmonic = Harmonic(chunk_size){
+                        .multiplier = mulAccum,
+                        .global_amp = ampAccum,
+                        .onset_amp_smooth = onsetAccum,
+                        .offset_amp_smooth = offsetAccum,
+                        .snap = snapRule,
+                    };
+                    try group.harmonics.append(harmonic);
+                    advancementFunc(&mulAccum, &ampAccum, &onsetAccum, &offsetAccum);
+                }
+                try self.groups.append(group);
+                mulAdvAccum += multiplierAdvanceBetweenKeys;
             }
-            try self.groups.append(group);
         }
 
         pub fn deinit(self: *This) void {
@@ -161,12 +176,13 @@ pub fn Synthesizer(sample_rate: comptime_int, chunk_size: comptime_int) !type {
             const base_frequency = hz_stuff.logScale(mouse_x, 1920, @floatFromInt(self.min_freq), @floatFromInt(self.max_freq));
 
             @memset(output[0..chunk_size], 0.0);
+            var temp_buffer: [chunk_size]f32 = undefined; // Moved outside the loop
+
             for (self.groups.items) |*group| {
                 const is_group_active = self.state.keys_pressed[@intCast(group.key)] != 0;
                 for (group.harmonics.items) |*harmonic| {
                     harmonic.setActive(is_group_active);
-                    var temp_buffer: [chunk_size]f32 = undefined;
-                    harmonic.generateSineWave(&temp_buffer, @intFromFloat(base_frequency), base_amp, sample_rate);
+                    harmonic.generateSineWave(&temp_buffer, @intFromFloat(base_frequency), base_amp / 2, sample_rate);
                     for (0..chunk_size) |i| {
                         output[i] += temp_buffer[i];
                     }
