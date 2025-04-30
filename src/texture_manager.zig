@@ -68,16 +68,28 @@ pub const TextureManager = struct {
 
     pub fn renderDot(
         self: *TextureManager,
-        x: f64,
+        freq: f32,
+        min_freq: f32,
+        max_freq: f32,
         y: c_int,
         size: c_int,
         color: c.SDL_Color,
     ) void {
         _ = c.SDL_SetTextureColorMod(self.dot_texture, color.r, color.g, color.b);
         _ = c.SDL_SetTextureAlphaMod(self.dot_texture, color.a);
-        std.debug.print("x pos: {d}, frequency: {d}\n", .{ x * 2, x });
+
+        // Calculate screen position using logarithmic scaling
+
+        const screen_width = 1920.0; // Or pass this as a parameter
+        const x_pos = frequencyToScreenPosition(
+            freq,
+            min_freq,
+            max_freq,
+            screen_width,
+        );
+        std.debug.print("x = {d}\n", .{x_pos});
         const dest_rect = c.SDL_Rect{
-            .x = @intFromFloat(x * 2),
+            .x = @intFromFloat(@mod(@max(1, screen_width - x_pos - @as(f64, @floatFromInt(size)) / 2.0), screen_width)), // Center the dot
             .y = y,
             .w = size,
             .h = size,
@@ -93,6 +105,7 @@ pub const TextureManager = struct {
         height: c_int,
     ) void {
         const texture = self.textures[note];
+
         const dest_rect = c.SDL_Rect{
             .x = x,
             .y = y,
@@ -102,3 +115,24 @@ pub const TextureManager = struct {
         _ = c.SDL_RenderCopy(self.renderer, texture, null, &dest_rect);
     }
 };
+
+pub fn frequencyToScreenPosition(
+    freq: f32,
+    min_freq: f32,
+    max_freq: f32,
+    screen_width: f32,
+) f32 {
+    std.debug.assert(min_freq > 0.0);
+    std.debug.assert(max_freq > min_freq);
+    std.debug.assert(freq >= min_freq and freq <= max_freq);
+
+    const log_min = std.math.log10(min_freq);
+    const log_max = std.math.log10(max_freq);
+    const log_freq = std.math.log10(freq);
+
+    // Normalize to [0, 1] range on logarithmic scale
+    const normalized = (log_freq - log_min) / (log_max - log_min);
+
+    // Map to screen coordinates (from right to left, based on your formula)
+    return screen_width * (1.0 - normalized);
+}

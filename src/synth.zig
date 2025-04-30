@@ -43,7 +43,7 @@ pub fn Harmonic(chunk_size: comptime_int) type {
 
             //if (self.is_active) std.debug.print("generating {d} frequency\n", .{actual_freq});
             const amp_increment = (target_amp - self.amp) / @as(f64, @floatFromInt(chunk_size));
-
+            //std.debug.print("ACTUAL playng frequency{d}\n", .{actual_freq});
             const angular_freq = 2.0 * std.math.pi * self.current_frequency;
             const sample_rate_f64 = @as(f64, @floatFromInt(sample_rate));
             const phase_inc = angular_freq / sample_rate_f64;
@@ -204,9 +204,11 @@ pub fn Synthesizer(sample_rate: comptime_int, chunk_size: comptime_int) !type {
 
                     // Calculate X position (frequency)
                     const freq = harmonic.current_frequency;
-                    //std.debug.print("freq: {d}\n", .{freq});
+                    //std.debug.print("dot freq: {d}\n", .{freq});
                     self.texture_manager.renderDot(
-                        freq,
+                        @floatCast(freq),
+                        @floatFromInt(self.min_freq),
+                        @floatFromInt(self.max_freq),
                         self.state.mouse_pos[1],
                         8, // size
                         dot_color,
