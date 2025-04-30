@@ -1,4 +1,4 @@
-const chunksz = 2048;
+const chunksz = 512;
 const keys: [48]Keycodes = .{
     .Num1,
     .Q,
@@ -68,18 +68,7 @@ pub fn main() !void {
     // snapRule: u8,
     // multiplierAdvanceBetweenKeys: f32,
     //count: usize,
-    try synth.genGroupWithRule(&.{Keycodes.A}, advancement, 0.2, 1, 0.5, 0.1, 0, 1.0 / 12.0, 5);
-    // try synth.genGroupWithRule(
-    //     &keys,
-    //     advancement,
-    //     0.2,
-    //     1,
-    //     0.5,
-    //     0.1,
-    //     0,
-    //     1.0 / 24.0,
-    //     1,
-    // );
+    try synth.genGroupWithRule(&.{Keycodes.A}, advancement, 1, 1, 0.5, 0.1, 0, 1.0 / 12.0, 1);
     synth.state.advance();
     synth.initStream();
     while (synth.state.currentEvent.type != c.SDL_QUIT) {

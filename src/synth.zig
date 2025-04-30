@@ -33,7 +33,6 @@ pub fn Harmonic(chunk_size: comptime_int) type {
             } else {
                 actual_freq = @as(f64, @floatFromInt(initial_frequency)) * self.multiplier;
             }
-
             if (self.is_active) {
                 self.current_frequency = actual_freq;
             }
@@ -42,7 +41,7 @@ pub fn Harmonic(chunk_size: comptime_int) type {
             else
                 @max(0.0, self.amp - self.offset_amp_smooth);
 
-            if (self.is_active) std.debug.print("generating {d} frequency\n", .{actual_freq});
+            //if (self.is_active) std.debug.print("generating {d} frequency\n", .{actual_freq});
             const amp_increment = (target_amp - self.amp) / @as(f64, @floatFromInt(chunk_size));
 
             const angular_freq = 2.0 * std.math.pi * self.current_frequency;
@@ -184,13 +183,14 @@ pub fn Synthesizer(sample_rate: comptime_int, chunk_size: comptime_int) !type {
 
                 // Draw vertical line
                 _ = c.SDL_RenderDrawLine(state.renderer, x_pos, 0, x_pos, screen_height);
-                const note_index = @as(u4, @intCast(@mod(midi_note - 2, 12)));
+                const note_index = @as(u4, @intCast(@mod(midi_note, 12)));
                 self.texture_manager.renderNote(
                     note_index,
                     x_pos + 5,
                     10,
                     20, // width
                     20, // height
+
                 );
             }
 
@@ -204,15 +204,10 @@ pub fn Synthesizer(sample_rate: comptime_int, chunk_size: comptime_int) !type {
 
                     // Calculate X position (frequency)
                     const freq = harmonic.current_frequency;
-                    const x_pos = @mod(@as(c_int, @intFromFloat(freq)), screen_width);
-
-                    // Calculate Y position (amplitude, inverted since SDL has Y=0 at top)
-                    const y_pos = screen_height - @as(c_int, @intFromFloat(harmonic.amp * @as(f64, @floatFromInt(screen_height))));
-
-                    // Render dot
+                    //std.debug.print("freq: {d}\n", .{freq});
                     self.texture_manager.renderDot(
-                        x_pos,
-                        y_pos,
+                        freq,
+                        self.state.mouse_pos[1],
                         8, // size
                         dot_color,
                     );
@@ -238,7 +233,6 @@ pub fn Synthesizer(sample_rate: comptime_int, chunk_size: comptime_int) !type {
             const base_amp: f64 = 1 - (mouse_y / @as(f64, @floatFromInt(self.state.screen_y)));
 
             const base_frequency = hz_stuff.logScale(mouse_x, 1920, @floatFromInt(self.min_freq), @floatFromInt(self.max_freq));
-
             @memset(output[0..chunk_size], 0.0);
             var temp_buffer: [chunk_size]f32 = undefined; // Moved outside the loop
 
@@ -255,6 +249,7 @@ pub fn Synthesizer(sample_rate: comptime_int, chunk_size: comptime_int) !type {
         }
     };
 }
+
 const TextureManager = @import("texture_manager.zig").TextureManager;
 const text_renderer = @import("text_renderer.zig");
 const SdlKeycodes = @import("sdl_keycodes.zig").SdlKeycodes;

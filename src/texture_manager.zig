@@ -1,5 +1,6 @@
 // texture_manager.zig
 const std = @import("std");
+const freqstuff = @import("freq_stuff.zig");
 const c = @cImport({
     @cInclude("SDL2/SDL.h");
 });
@@ -67,17 +68,17 @@ pub const TextureManager = struct {
 
     pub fn renderDot(
         self: *TextureManager,
-        x: c_int,
+        x: f64,
         y: c_int,
         size: c_int,
         color: c.SDL_Color,
     ) void {
         _ = c.SDL_SetTextureColorMod(self.dot_texture, color.r, color.g, color.b);
         _ = c.SDL_SetTextureAlphaMod(self.dot_texture, color.a);
-
+        std.debug.print("x pos: {d}, frequency: {d}\n", .{ x * 2, x });
         const dest_rect = c.SDL_Rect{
-            .x = x - @divFloor(size, 2),
-            .y = y - @divFloor(size, 2),
+            .x = @intFromFloat(x * 2),
+            .y = y,
             .w = size,
             .h = size,
         };
