@@ -194,6 +194,30 @@ pub fn Synthesizer(sample_rate: comptime_int, chunk_size: comptime_int) !type {
                 );
             }
 
+            const dot_color = c.SDL_Color{ .r = 255, .g = 0, .b = 0, .a = 255 }; // Red
+
+            for (self.groups.items) |*group| {
+                if (self.state.keys_pressed[@intCast(group.key)] == 0) continue;
+
+                for (group.harmonics.items) |*harmonic| {
+                    if (!harmonic.is_active or harmonic.amp < 0.01) continue;
+
+                    // Calculate X position (frequency)
+                    const freq = harmonic.current_frequency;
+                    const x_pos = @mod(@as(c_int, @intFromFloat(freq)), screen_width);
+
+                    // Calculate Y position (amplitude, inverted since SDL has Y=0 at top)
+                    const y_pos = screen_height - @as(c_int, @intFromFloat(harmonic.amp * @as(f64, @floatFromInt(screen_height))));
+
+                    // Render dot
+                    self.texture_manager.renderDot(
+                        x_pos,
+                        y_pos,
+                        8, // size
+                        dot_color,
+                    );
+                }
+            }
             c.SDL_RenderPresent(state.renderer);
         }
         pub fn deinit(self: *This) void {
