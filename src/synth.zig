@@ -6,7 +6,7 @@ pub fn Harmonic(chunk_size: comptime_int) type {
         global_amp: f32 = 1.0,
         phase: f64 = 0.0,
         onset_amp_smooth: f32 = 0.1,
-        offset_amp_smooth: f32 = 0.03,
+        offset_amp_smooth: f32 = 1,
         is_active: bool = false,
         last_active_frequency: f64 = 0.0,
         current_frequency: f64 = 0.0,
@@ -33,6 +33,7 @@ pub fn Harmonic(chunk_size: comptime_int) type {
             } else {
                 actual_freq = @as(f64, @floatFromInt(initial_frequency)) * self.multiplier;
             }
+
             if (self.is_active) {
                 self.current_frequency = actual_freq;
             }
@@ -40,6 +41,8 @@ pub fn Harmonic(chunk_size: comptime_int) type {
                 @min(1.0, self.amp + self.onset_amp_smooth)
             else
                 @max(0.0, self.amp - self.offset_amp_smooth);
+
+            if (self.is_active) std.debug.print("generating {d} frequency\n", .{actual_freq});
             const amp_increment = (target_amp - self.amp) / @as(f64, @floatFromInt(chunk_size));
 
             const angular_freq = 2.0 * std.math.pi * self.current_frequency;
@@ -98,14 +101,18 @@ pub fn Synthesizer(sample_rate: comptime_int, chunk_size: comptime_int) !type {
         groups: std.ArrayList(HarmonicGroup(chunk_size)),
         global_smoothing: f32 = 0.0,
         device: c.SDL_AudioDeviceID = undefined,
+        texture_manager: TextureManager,
         min_freq: u16 = 131,
         max_freq: u16 = 2094,
 
         pub fn init(alloc: std.mem.Allocator) !This {
+            const state = StateManager.init();
+            const texture_manager = try TextureManager.init(state.renderer);
             return .{
                 .groups = try std.ArrayList(HarmonicGroup(chunk_size)).initCapacity(alloc, 1),
                 .allocator = alloc,
-                .state = .init(),
+                .state = state,
+                .texture_manager = texture_manager,
             };
         }
 
@@ -138,7 +145,7 @@ pub fn Synthesizer(sample_rate: comptime_int, chunk_size: comptime_int) !type {
             for (trigger_keys) |key| {
                 var group = HarmonicGroup(chunk_size).init(self.allocator, @intFromEnum(key));
                 var ampAccum = initAmp;
-                var mulAccum: f32 = initMul + mulAdvAccum;
+                var mulAccum: f32 = initMul + initMul * mulAdvAccum;
                 var onsetAccum = onsetSmoothInit;
                 var offsetAccum = offsetSmoothInit;
                 for (0..count) |_| {
@@ -157,7 +164,40 @@ pub fn Synthesizer(sample_rate: comptime_int, chunk_size: comptime_int) !type {
             }
         }
 
+        pub fn renderGuidelines(self: *This) void {
+            const state = &self.state;
+            const screen_width = state.screen_x;
+            const screen_height = state.screen_y;
+
+            _ = c.SDL_SetRenderDrawColor(state.renderer, 0, 0, 0, 255);
+            _ = c.SDL_RenderClear(state.renderer);
+
+            _ = c.SDL_SetRenderDrawColor(state.renderer, 255, 255, 255, 100);
+
+            const min_midi = hz_stuff.freqToMidi(@floatFromInt(self.min_freq));
+            const max_midi = hz_stuff.freqToMidi(@floatFromInt(self.max_freq));
+
+            var midi_note: i32 = min_midi;
+            while (midi_note <= max_midi) : (midi_note += 1) {
+                const freq = hz_stuff.midiToFreq(midi_note);
+                const x_pos = hz_stuff.freqToScreenX(freq, self.min_freq, self.max_freq, screen_width);
+
+                // Draw vertical line
+                _ = c.SDL_RenderDrawLine(state.renderer, x_pos, 0, x_pos, screen_height);
+                const note_index = @as(u4, @intCast(@mod(midi_note - 2, 12)));
+                self.texture_manager.renderNote(
+                    note_index,
+                    x_pos + 5,
+                    10,
+                    20, // width
+                    20, // height
+                );
+            }
+
+            c.SDL_RenderPresent(state.renderer);
+        }
         pub fn deinit(self: *This) void {
+            self.texture_manager.deinit();
             c.SDL_CloseAudioDevice(self.device);
             self.groups.deinit();
         }
@@ -191,7 +231,8 @@ pub fn Synthesizer(sample_rate: comptime_int, chunk_size: comptime_int) !type {
         }
     };
 }
-
+const TextureManager = @import("texture_manager.zig").TextureManager;
+const text_renderer = @import("text_renderer.zig");
 const SdlKeycodes = @import("sdl_keycodes.zig").SdlKeycodes;
 const hz_stuff = @import("freq_stuff.zig");
 const StateManager = @import("state.zig").InputState;

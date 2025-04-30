@@ -12,29 +12,13 @@ pub const Action = enum([]InputCommand) { //starts with Keycodes.C
 
 };
 
-// pub fn takeInput(state: *State) Action {
-//     var act: Action = undefined;
-//     var inputs: [10]Keycodes = undefined;
-//     while (act == undefined) {
-//         state.advance();
-//         keyDetection: for (state.keys_pressed, 0..512) |key, i| {
-//             if (key == 1) {
-//                 for (&inputs) |v| {
-//                     if (v == undefined) {
-//                         v = @enumFromInt(i);
-//                         break :keyDetection;
-//                     }
-//                 }
-//             }
-//         }
-//     }
-// }
 const InputCommand = union(enum) {
     Key: Keycodes,
     Num: f64,
-    Range: .{ usize, usize },
+    Range: struct { usize, usize },
     Multiple: []usize,
     Str: []u8,
 };
+const std = @import("std");
 const State = @import("state.zig").InputState;
 const Keycodes = @import("sdl_keycodes.zig").SdlKeycodes;

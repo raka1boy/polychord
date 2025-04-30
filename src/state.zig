@@ -1,18 +1,31 @@
 pub const InputState = struct {
-    mouse_pos: @Vector(2, c_int) = .{ 0, 0 }, //x,y
+    mouse_pos: @Vector(2, c_int) = .{ 0, 0 },
     keys_pressed: [*]const u8,
     window: *c.SDL_Window = undefined,
+    renderer: *c.SDL_Renderer = undefined,
     currentEvent: c.SDL_Event = undefined,
     screen_x: c_int = 1920,
     screen_y: c_int = 1080,
     is_playing_mode: bool = true,
-    pub fn init() InputState {
-        _ = c.SDL_Init(c.SDL_INIT_EVENTS | c.SDL_INIT_VIDEO | c.SDL_INIT_AUDIO);
 
-        return .{ .keys_pressed = c.SDL_GetKeyboardState(null), .window = c.SDL_CreateWindow("govno 2", 100, 100, 1920, 1080, c.SDL_WINDOW_SHOWN | c.SDL_WINDOW_RESIZABLE).? };
+    pub fn init() InputState {
+        _ = c.SDL_Init(c.SDL_INIT_EVERYTHING);
+
+        const window = c.SDL_CreateWindow("Synthesizer", 100, 100, 1920, 1080, c.SDL_WINDOW_SHOWN | c.SDL_WINDOW_RESIZABLE).?;
+        const renderer = c.SDL_CreateRenderer(window, -1, c.SDL_RENDERER_ACCELERATED).?;
+
+        return .{
+            .keys_pressed = c.SDL_GetKeyboardState(null),
+            .window = window,
+            .renderer = renderer,
+        };
     }
+
     pub fn deinit(self: *InputState) void {
+        c.TTF_CloseFont(self.font);
+        c.SDL_DestroyRenderer(self.renderer);
         c.SDL_DestroyWindow(self.window);
+        c.TTF_Quit();
         c.SDL_Quit();
     }
     pub fn advance(self: *InputState) void {
