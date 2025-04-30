@@ -56,8 +56,8 @@ pub fn main() !void {
     const synthh = try synthes.Synthesizer(48000, chunksz);
 
     var synth = try synthh.init(alloc);
-    synth.min_freq = 512;
-    synth.max_freq = 1024;
+    synth.min_freq = 32;
+    synth.max_freq = 4196;
     defer synth.deinit();
     // trigger_keys: []const SdlKeycodes,
     // advancementFunc: fn (initmul: *f32, initamp: *f32, initonset: *f32, initoffset: *f32) void,
@@ -68,7 +68,7 @@ pub fn main() !void {
     // snapRule: u8,
     // multiplierAdvanceBetweenKeys: f32,
     //count: usize,
-    try synth.genGroupWithRule(&.{Keycodes.A}, advancement, 1, 1, 0.5, 0.1, 0, 1.0 / 12.0, 3);
+    try synth.genGroupWithRule(&.{Keycodes.A}, advancement, 1, 1, 0.5, 0.1, 0, 1.0 / 12.0, 100);
     synth.state.advance();
     synth.initStream();
     while (synth.state.currentEvent.type != c.SDL_QUIT) {
@@ -79,7 +79,7 @@ pub fn main() !void {
 
 fn advancement(initmul: *f32, initamp: *f32, initonset: *f32, initoffset: *f32) void {
     initmul.* += 0.1;
-    initamp.* *= 0.5;
+    initamp.* *= 0.99;
     initonset.* += 0;
     initoffset.* += 0.3;
 }

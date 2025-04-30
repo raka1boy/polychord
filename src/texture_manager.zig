@@ -71,7 +71,7 @@ pub const TextureManager = struct {
         freq: f32,
         min_freq: f32,
         max_freq: f32,
-        y: c_int,
+        amp: f32,
         size: c_int,
         color: c.SDL_Color,
     ) void {
@@ -87,10 +87,10 @@ pub const TextureManager = struct {
             max_freq,
             screen_width,
         );
-        std.debug.print("x = {d}\n", .{x_pos});
+        //std.debug.print("x = {d}\n", .{x_pos});
         const dest_rect = c.SDL_Rect{
             .x = @intFromFloat(@mod(@max(1, screen_width - x_pos - @as(f64, @floatFromInt(size)) / 2.0), screen_width)), // Center the dot
-            .y = y,
+            .y = @intFromFloat(amp),
             .w = size,
             .h = size,
         };
@@ -122,10 +122,6 @@ pub fn frequencyToScreenPosition(
     max_freq: f32,
     screen_width: f32,
 ) f32 {
-    std.debug.assert(min_freq > 0.0);
-    std.debug.assert(max_freq > min_freq);
-    std.debug.assert(freq >= min_freq and freq <= max_freq);
-
     const log_min = std.math.log10(min_freq);
     const log_max = std.math.log10(max_freq);
     const log_freq = std.math.log10(freq);

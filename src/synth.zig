@@ -101,7 +101,7 @@ pub fn Synthesizer(sample_rate: comptime_int, chunk_size: comptime_int) !type {
         global_smoothing: f32 = 0.0,
         device: c.SDL_AudioDeviceID = undefined,
         texture_manager: TextureManager,
-        min_freq: u16 = 131,
+        min_freq: u16 = 32,
         max_freq: u16 = 2094,
 
         pub fn init(alloc: std.mem.Allocator) !This {
@@ -209,7 +209,7 @@ pub fn Synthesizer(sample_rate: comptime_int, chunk_size: comptime_int) !type {
                         @floatCast(freq),
                         @floatFromInt(self.min_freq),
                         @floatFromInt(self.max_freq),
-                        self.state.mouse_pos[1],
+                        harmonic.global_amp * @as(f32, @floatFromInt(self.state.mouse_pos[1])),
                         8, // size
                         dot_color,
                     );
