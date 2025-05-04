@@ -2,15 +2,16 @@ pub fn Harmonic(chunk_size: comptime_int) type {
     return struct {
         const This = @This();
         multiplier: f32,
-        amp: f64 = 0.0, // Changed to f64
+        amp: f32 = 0.0, // Changed to f64
         global_amp: f32 = 1.0,
-        phase: f64 = 0.0,
+        phase: f32 = 0.0,
         onset_amp_smooth: f32 = 0.1,
         offset_amp_smooth: f32 = 1,
         is_active: bool = false,
-        last_active_frequency: f64 = 0.0,
-        current_frequency: f64 = 0.0,
+        last_active_frequency: u15 = 0, //32767 is max freq
+        current_frequency: u15 = 0,
         snap: u8 = 0, //if 0 then no snapping
+        dot_color: c.SDL_Color,
 
         pub fn init(mul: f32, amp: f64) This {
             var xoro = std.Random.Xoroshiro128.init(@intCast(std.time.microTimestamp()));
@@ -19,6 +20,12 @@ pub fn Harmonic(chunk_size: comptime_int) type {
                 .multiplier = mul,
                 .amp = amp,
                 .phase = std.math.pi * 2.0 * rand.float(f32), // Random phase
+                .dot_color = .{
+                    .r = rand.uintAtMost(c_int, 255),
+                    .g = rand.uintAtMost(c_int, 255),
+                    .b = rand.uintAtMost(c_int, 255),
+                    .a = 255,
+                },
             };
         }
 
@@ -26,12 +33,16 @@ pub fn Harmonic(chunk_size: comptime_int) type {
             self.is_active = active;
         }
 
-        pub fn generateSineWave(self: *This, buffer: *[chunk_size]f32, initial_frequency: u16, external_amp: f64, sample_rate: usize) void {
-            var actual_freq: f64 = 0;
+        pub fn generateSineWave(self: *This, buffer: anytype, initial_frequency: anytype, external_amp: f64, sample_rate: usize) void {
+            var actual_freq: u15 = 0;
             if (self.snap != 0) {
-                actual_freq = hz_stuff.closestETFreq(@floatFromInt(self.snap), @as(f64, @floatFromInt(initial_frequency)) * self.multiplier);
+                const hz_multiplied: @TypeOf(self.current_frequency) = @intFromFloat(initial_frequency * self.multiplier);
+                actual_freq = hz_stuff.closestETFreq(
+                    self.snap,
+                    hz_multiplied,
+                );
             } else {
-                actual_freq = @as(f64, @floatFromInt(initial_frequency)) * self.multiplier;
+                actual_freq = @intFromFloat(initial_frequency * self.multiplier);
             }
             if (self.is_active) {
                 self.current_frequency = actual_freq;
@@ -41,20 +52,17 @@ pub fn Harmonic(chunk_size: comptime_int) type {
             else
                 @max(0.0, self.amp - self.offset_amp_smooth);
 
-            //if (self.is_active) std.debug.print("generating {d} frequency\n", .{actual_freq});
-            const amp_increment = (target_amp - self.amp) / @as(f64, @floatFromInt(chunk_size));
-            //std.debug.print("ACTUAL playng frequency{d}\n", .{actual_freq});
-            const angular_freq = 2.0 * std.math.pi * self.current_frequency;
-            const sample_rate_f64 = @as(f64, @floatFromInt(sample_rate));
-            const phase_inc = angular_freq / sample_rate_f64;
+            const amp_increment: f32 = (target_amp - self.amp) / @as(f32, @floatFromInt(chunk_size));
+            const angular_freq: f32 = 2.0 * std.math.pi * @as(f32, @floatFromInt(self.current_frequency));
+            const phase_inc: f32 = angular_freq / @as(f32, @floatFromInt(sample_rate));
 
             for (0..chunk_size) |i| {
-                const current_amp = self.amp + amp_increment * @as(f64, @floatFromInt(i));
-                const phase = self.phase + phase_inc * @as(f64, @floatFromInt(i));
-                buffer[i] = @floatCast(external_amp * (self.global_amp * (current_amp * std.math.sin(phase))));
+                const current_amp: f32 = self.amp + amp_increment * @as(f32, @floatFromInt(i));
+                const phase: f32 = self.phase + phase_inc * @as(f32, @floatFromInt(i));
+                buffer[i] = @floatCast(external_amp * (self.global_amp * (current_amp * @sin(phase))));
             }
 
-            self.phase += phase_inc * @as(f64, @floatFromInt(chunk_size));
+            self.phase += phase_inc * @as(f32, @floatFromInt(chunk_size));
             self.phase = @mod(self.phase, 2.0 * std.math.pi);
             self.amp = target_amp;
 
@@ -101,8 +109,8 @@ pub fn Synthesizer(sample_rate: comptime_int, chunk_size: comptime_int) !type {
         global_smoothing: f32 = 0.0,
         device: c.SDL_AudioDeviceID = undefined,
         texture_manager: TextureManager,
-        min_freq: u16 = 32,
-        max_freq: u16 = 2094,
+        min_freq: u15 = 32,
+        max_freq: u15 = 4192,
 
         pub fn init(alloc: std.mem.Allocator) !This {
             const state = StateManager.init();
@@ -140,6 +148,8 @@ pub fn Synthesizer(sample_rate: comptime_int, chunk_size: comptime_int) !type {
             multiplierAdvanceBetweenKeys: f32,
             count: usize,
         ) !void {
+            var xoro = std.Random.Xoroshiro128.init(@intCast(std.time.microTimestamp()));
+            const rand = xoro.random();
             var mulAdvAccum: f32 = 0;
             for (trigger_keys) |key| {
                 var group = HarmonicGroup(chunk_size).init(self.allocator, @intFromEnum(key));
@@ -154,6 +164,12 @@ pub fn Synthesizer(sample_rate: comptime_int, chunk_size: comptime_int) !type {
                         .onset_amp_smooth = onsetAccum,
                         .offset_amp_smooth = offsetAccum,
                         .snap = snapRule,
+                        .dot_color = .{
+                            .r = rand.intRangeAtMost(u8, 100, 255),
+                            .g = rand.intRangeAtMost(u8, 100, 255),
+                            .b = rand.intRangeAtMost(u8, 100, 255),
+                            .a = 255,
+                        },
                     };
                     try group.harmonics.append(harmonic);
                     advancementFunc(&mulAccum, &ampAccum, &onsetAccum, &offsetAccum);
@@ -194,8 +210,6 @@ pub fn Synthesizer(sample_rate: comptime_int, chunk_size: comptime_int) !type {
                 );
             }
 
-            const dot_color = c.SDL_Color{ .r = 255, .g = 0, .b = 0, .a = 255 }; // Red
-
             for (self.groups.items) |*group| {
                 if (self.state.keys_pressed[@intCast(group.key)] == 0) continue;
 
@@ -206,12 +220,13 @@ pub fn Synthesizer(sample_rate: comptime_int, chunk_size: comptime_int) !type {
                     const freq = harmonic.current_frequency;
                     //std.debug.print("dot freq: {d}\n", .{freq});
                     self.texture_manager.renderDot(
-                        @floatCast(freq),
-                        @floatFromInt(self.min_freq),
-                        @floatFromInt(self.max_freq),
+                        @intCast(state.screen_x),
+                        freq,
+                        self.min_freq,
+                        self.max_freq,
                         harmonic.global_amp * @as(f32, @floatFromInt(self.state.mouse_pos[1])),
                         8, // size
-                        dot_color,
+                        harmonic.dot_color,
                     );
                 }
             }
@@ -230,19 +245,23 @@ pub fn Synthesizer(sample_rate: comptime_int, chunk_size: comptime_int) !type {
             if (!self.state.is_playing_mode) return;
             self.state.advance();
 
-            const mouse_x = @as(f32, @floatFromInt(self.state.mouse_pos[0]));
             const mouse_y: f64 = @floatFromInt(self.state.mouse_pos[1]);
             const base_amp: f64 = 1 - (mouse_y / @as(f64, @floatFromInt(self.state.screen_y)));
 
-            const base_frequency = hz_stuff.logScale(mouse_x, 1920, @floatFromInt(self.min_freq), @floatFromInt(self.max_freq));
+            const base_frequency = hz_stuff.logScale(
+                self.state.mouse_pos[0],
+                self.state.screen_x,
+                self.min_freq,
+                self.max_freq,
+            );
             @memset(output[0..chunk_size], 0.0);
-            var temp_buffer: [chunk_size]f32 = undefined; // Moved outside the loop
+            var temp_buffer: @Vector(chunk_size, f32) = undefined; // Moved outside the loop
 
             for (self.groups.items) |*group| {
                 const is_group_active = self.state.keys_pressed[@intCast(group.key)] != 0;
                 for (group.harmonics.items) |*harmonic| {
                     harmonic.setActive(is_group_active);
-                    harmonic.generateSineWave(&temp_buffer, @intFromFloat(base_frequency), base_amp / 2, sample_rate);
+                    harmonic.generateSineWave(&temp_buffer, base_frequency, base_amp / 2, sample_rate);
                     for (0..chunk_size) |i| {
                         output[i] += temp_buffer[i];
                     }

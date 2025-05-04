@@ -29,12 +29,16 @@ pub const InputState = struct {
         c.SDL_Quit();
     }
     pub fn advance(self: *InputState) void {
+        c.SDL_GetWindowSize(self.window, &self.screen_x, &self.screen_y);
+        //std.debug.print("x:{d} y:{d}\n", .{ self.screen_x, self.screen_y });
         _ = c.SDL_GetMouseState(&self.mouse_pos[0], &self.mouse_pos[1]);
+        // std.debug.print("keys pressed: ", .{});
         // for (0..512) |i| {
         //     if (self.keys_pressed[i] != 0) {
-        //         std.debug.print("key pressed: {d}\n", .{i});
+        //         std.debug.print("{d}, ", .{i});
         //     }
         // }
+        // std.debug.print("\n", .{});
         _ = c.SDL_PollEvent(&self.currentEvent);
         c.SDL_GetWindowSize(self.window, &self.screen_x, &self.screen_y);
         c.SDL_PumpEvents();

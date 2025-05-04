@@ -1,5 +1,10 @@
-const chunksz = 512;
-const keys: [48]Keycodes = .{
+const chunksz = std.math.pow(i32, 2, 9);
+
+const keys: [53]Keycodes = .{
+    .GRAVE,
+    .TAB,
+    .CAPSLOCK,
+    .LSHIFT,
     .Num1,
     .Q,
     .A,
@@ -48,16 +53,18 @@ const keys: [48]Keycodes = .{
     .RIGHTBRACKET,
     .RETURN,
     .BACKSLASH,
+    .BACKSPACE,
 };
 pub fn main() !void {
+    std.debug.print("chunks : {d}", .{chunksz});
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     const alloc = gpa.allocator();
 
     const synthh = try synthes.Synthesizer(48000, chunksz);
 
     var synth = try synthh.init(alloc);
-    synth.min_freq = 32;
-    synth.max_freq = 4196;
+    synth.min_freq = noteC(1);
+    synth.max_freq = noteC(3);
     defer synth.deinit();
     // trigger_keys: []const SdlKeycodes,
     // advancementFunc: fn (initmul: *f32, initamp: *f32, initonset: *f32, initoffset: *f32) void,
@@ -68,7 +75,17 @@ pub fn main() !void {
     // snapRule: u8,
     // multiplierAdvanceBetweenKeys: f32,
     //count: usize,
-    try synth.genGroupWithRule(&.{Keycodes.A}, advancement, 1, 1, 0.5, 0.1, 0, 1.0 / 12.0, 100);
+    try synth.genGroupWithRule(
+        &keys,
+        advancement,
+        1,
+        1,
+        0.05,
+        0.01,
+        0,
+        1.0 / 9.0,
+        1,
+    );
     synth.state.advance();
     synth.initStream();
     while (synth.state.currentEvent.type != c.SDL_QUIT) {
@@ -76,12 +93,21 @@ pub fn main() !void {
         synth.state.advance();
     }
 }
-
+fn noteC(octave: usize) u15 {
+    var c_accum: f64 = 32.703;
+    for (0..octave) |_| {
+        c_accum *= 2;
+    }
+    return @intFromFloat(c_accum);
+}
 fn advancement(initmul: *f32, initamp: *f32, initonset: *f32, initoffset: *f32) void {
-    initmul.* += 0.1;
-    initamp.* *= 0.99;
+    var xoro = std.Random.Xoroshiro128.init(@intCast(std.time.microTimestamp()));
+    const rand = xoro.random();
+    _ = rand;
+    initmul.* += 1;
+    initamp.* *= 0.40;
     initonset.* += 0;
-    initoffset.* += 0.3;
+    initoffset.* += 0;
 }
 const Keycodes = @import("sdl_keycodes.zig").SdlKeycodes;
 const State = @import("state.zig").InputState;

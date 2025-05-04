@@ -11,7 +11,6 @@ pub const TextureManager = struct {
     dot_texture: *c.SDL_Texture,
 
     pub fn init(renderer: *c.SDL_Renderer) !TextureManager {
-        // Note: We're embedding BMP data directly (converted from PNGs)
         const note_bmps = [_][]const u8{
             @embedFile("assets/C.bmp"),
             @embedFile("assets/C#.bmp"),
@@ -68,28 +67,25 @@ pub const TextureManager = struct {
 
     pub fn renderDot(
         self: *TextureManager,
-        freq: f32,
-        min_freq: f32,
-        max_freq: f32,
+        max_screen_x: u32,
+        freq: u15,
+        min_freq: u15,
+        max_freq: u15,
         amp: f32,
-        size: c_int,
+        size: comptime_int,
         color: c.SDL_Color,
     ) void {
         _ = c.SDL_SetTextureColorMod(self.dot_texture, color.r, color.g, color.b);
         _ = c.SDL_SetTextureAlphaMod(self.dot_texture, color.a);
-
-        // Calculate screen position using logarithmic scaling
-
-        const screen_width = 1920.0; // Or pass this as a parameter
         const x_pos = frequencyToScreenPosition(
-            freq,
-            min_freq,
-            max_freq,
-            screen_width,
+            @floatFromInt(freq),
+            @floatFromInt(min_freq),
+            @floatFromInt(max_freq),
+            max_screen_x,
         );
-        //std.debug.print("x = {d}\n", .{x_pos});
+        std.debug.print("x pos: {d}, assumed {d}\n", .{ x_pos, @mod(@max(1, max_screen_x - x_pos -| size / 2), max_screen_x) });
         const dest_rect = c.SDL_Rect{
-            .x = @intFromFloat(@mod(@max(1, screen_width - x_pos - @as(f64, @floatFromInt(size)) / 2.0), screen_width)), // Center the dot
+            .x = @intCast(@mod(max_screen_x - x_pos -| size / 2, max_screen_x)), // Center the dot
             .y = @intFromFloat(amp),
             .w = size,
             .h = size,
@@ -106,13 +102,16 @@ pub const TextureManager = struct {
     ) void {
         const texture = self.textures[note];
 
-        const dest_rect = c.SDL_Rect{
+        var dest_rect = c.SDL_Rect{
             .x = x,
             .y = y,
             .w = width,
             .h = height,
         };
-        _ = c.SDL_RenderCopy(self.renderer, texture, null, &dest_rect);
+        for (0..6) |i| {
+            _ = c.SDL_RenderCopy(self.renderer, texture, null, &dest_rect);
+            dest_rect.y += @intCast(i + 200);
+        }
     }
 };
 
@@ -120,15 +119,12 @@ pub fn frequencyToScreenPosition(
     freq: f32,
     min_freq: f32,
     max_freq: f32,
-    screen_width: f32,
-) f32 {
+    screen_width: u32,
+) u32 {
     const log_min = std.math.log10(min_freq);
     const log_max = std.math.log10(max_freq);
     const log_freq = std.math.log10(freq);
-
-    // Normalize to [0, 1] range on logarithmic scale
     const normalized = (log_freq - log_min) / (log_max - log_min);
-
-    // Map to screen coordinates (from right to left, based on your formula)
-    return screen_width * (1.0 - normalized);
+    const res: u32 = @intFromFloat(@mod(@as(f32, @floatFromInt(screen_width)) * (1 - normalized), @as(f32, @floatFromInt(screen_width))));
+    return res;
 }
