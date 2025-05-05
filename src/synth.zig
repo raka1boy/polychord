@@ -1,3 +1,4 @@
+const HARMONIC_CUT_AMP_THRESHOLD = 0.01;
 pub fn Harmonic(chunk_size: comptime_int) type {
     return struct {
         const This = @This();
@@ -11,21 +12,14 @@ pub fn Harmonic(chunk_size: comptime_int) type {
         last_active_frequency: u15 = 0, //32767 is max freq
         current_frequency: u15 = 0,
         snap: u8 = 0, //if 0 then no snapping
-        dot_color: c.SDL_Color,
 
-        pub fn init(mul: f32, amp: f64) This {
+        pub fn init(mul: f32, global_amp: f32) This {
             var xoro = std.Random.Xoroshiro128.init(@intCast(std.time.microTimestamp()));
             const rand = xoro.random();
             return .{
                 .multiplier = mul,
-                .amp = amp,
+                .global_amp = global_amp,
                 .phase = std.math.pi * 2.0 * rand.float(f32), // Random phase
-                .dot_color = .{
-                    .r = rand.uintAtMost(c_int, 255),
-                    .g = rand.uintAtMost(c_int, 255),
-                    .b = rand.uintAtMost(c_int, 255),
-                    .a = 255,
-                },
             };
         }
 
@@ -79,9 +73,22 @@ pub fn HarmonicGroup(chunk_size: comptime_int) type {
         const This = @This();
         harmonics: std.ArrayList(Harmonic(chunk_size)),
         key: c_int,
+        dot_color: c.SDL_Color,
 
         pub fn init(alloc: std.mem.Allocator, key: c_int) This {
-            return .{ .harmonics = std.ArrayList(Harmonic(chunk_size)).init(alloc), .key = key };
+            var xoro = std.Random.Xoroshiro128.init(@intCast(std.time.microTimestamp()));
+            const rand = xoro.random();
+
+            return .{
+                .harmonics = std.ArrayList(Harmonic(chunk_size)).init(alloc),
+                .key = key,
+                .dot_color = .{
+                    .r = rand.uintAtMost(u8, 255),
+                    .g = rand.uintAtMost(u8, 255),
+                    .b = rand.uintAtMost(u8, 255),
+                    .a = 255,
+                },
+            };
         }
 
         pub fn addHarmonic(self: *This, h: Harmonic(chunk_size)) !void {
@@ -148,8 +155,6 @@ pub fn Synthesizer(sample_rate: comptime_int, chunk_size: comptime_int) !type {
             multiplierAdvanceBetweenKeys: f32,
             count: usize,
         ) !void {
-            var xoro = std.Random.Xoroshiro128.init(@intCast(std.time.microTimestamp()));
-            const rand = xoro.random();
             var mulAdvAccum: f32 = 0;
             for (trigger_keys) |key| {
                 var group = HarmonicGroup(chunk_size).init(self.allocator, @intFromEnum(key));
@@ -164,12 +169,6 @@ pub fn Synthesizer(sample_rate: comptime_int, chunk_size: comptime_int) !type {
                         .onset_amp_smooth = onsetAccum,
                         .offset_amp_smooth = offsetAccum,
                         .snap = snapRule,
-                        .dot_color = .{
-                            .r = rand.intRangeAtMost(u8, 100, 255),
-                            .g = rand.intRangeAtMost(u8, 100, 255),
-                            .b = rand.intRangeAtMost(u8, 100, 255),
-                            .a = 255,
-                        },
                     };
                     try group.harmonics.append(harmonic);
                     advancementFunc(&mulAccum, &ampAccum, &onsetAccum, &offsetAccum);
@@ -212,13 +211,9 @@ pub fn Synthesizer(sample_rate: comptime_int, chunk_size: comptime_int) !type {
 
             for (self.groups.items) |*group| {
                 if (self.state.keys_pressed[@intCast(group.key)] == 0) continue;
-
                 for (group.harmonics.items) |*harmonic| {
                     if (!harmonic.is_active or harmonic.amp < 0.01) continue;
-
-                    // Calculate X position (frequency)
                     const freq = harmonic.current_frequency;
-                    //std.debug.print("dot freq: {d}\n", .{freq});
                     self.texture_manager.renderDot(
                         @intCast(state.screen_x),
                         freq,
@@ -226,7 +221,7 @@ pub fn Synthesizer(sample_rate: comptime_int, chunk_size: comptime_int) !type {
                         self.max_freq,
                         harmonic.global_amp * @as(f32, @floatFromInt(self.state.mouse_pos[1])),
                         8, // size
-                        harmonic.dot_color,
+                        group.dot_color,
                     );
                 }
             }
@@ -238,7 +233,10 @@ pub fn Synthesizer(sample_rate: comptime_int, chunk_size: comptime_int) !type {
             self.groups.deinit();
         }
 
+        // In the audioCallback function:
         pub fn audioCallback(userdata: ?*anyopaque, output_buf: [*c]u8, len: c_int) callconv(.c) void {
+            @setFloatMode(.optimized);
+            @setRuntimeSafety(false);
             _ = len;
             var output: [*]f32 = @ptrCast(@alignCast(output_buf));
             const self: *This = @ptrCast(@alignCast(userdata.?));
@@ -255,8 +253,7 @@ pub fn Synthesizer(sample_rate: comptime_int, chunk_size: comptime_int) !type {
                 self.max_freq,
             );
             @memset(output[0..chunk_size], 0.0);
-            var temp_buffer: @Vector(chunk_size, f32) = undefined; // Moved outside the loop
-
+            var temp_buffer: [chunk_size]f32 = undefined;
             for (self.groups.items) |*group| {
                 const is_group_active = self.state.keys_pressed[@intCast(group.key)] != 0;
                 for (group.harmonics.items) |*harmonic| {

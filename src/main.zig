@@ -63,33 +63,24 @@ pub fn main() !void {
     const synthh = try synthes.Synthesizer(48000, chunksz);
 
     var synth = try synthh.init(alloc);
-    synth.min_freq = noteC(1);
-    synth.max_freq = noteC(3);
+    synth.min_freq = noteC(3);
+    synth.max_freq = noteC(5);
     defer synth.deinit();
-    // trigger_keys: []const SdlKeycodes,
-    // advancementFunc: fn (initmul: *f32, initamp: *f32, initonset: *f32, initoffset: *f32) void,
-    // initMul: f32,
-    // initAmp: f32,
-    // onsetSmoothInit: f32,
-    // offsetSmoothInit: f32,
-    // snapRule: u8,
-    // multiplierAdvanceBetweenKeys: f32,
-    //count: usize,
     try synth.genGroupWithRule(
         &keys,
         advancement,
         1,
         1,
-        0.05,
-        0.01,
+        0.5,
+        0.5,
         0,
-        1.0 / 9.0,
-        1,
+        1.0 / 48.0,
+        10,
     );
     synth.state.advance();
     synth.initStream();
     while (synth.state.currentEvent.type != c.SDL_QUIT) {
-        synth.renderGuidelines(); // Draw guidelines
+        synth.renderGuidelines();
         synth.state.advance();
     }
 }
@@ -104,10 +95,10 @@ fn advancement(initmul: *f32, initamp: *f32, initonset: *f32, initoffset: *f32) 
     var xoro = std.Random.Xoroshiro128.init(@intCast(std.time.microTimestamp()));
     const rand = xoro.random();
     _ = rand;
-    initmul.* += 1;
-    initamp.* *= 0.40;
-    initonset.* += 0;
-    initoffset.* += 0;
+    initmul.* *= 1.5;
+    initamp.* *= 0.4;
+    initonset.* = 0.6;
+    initoffset.* = 0.2;
 }
 const Keycodes = @import("sdl_keycodes.zig").SdlKeycodes;
 const State = @import("state.zig").InputState;

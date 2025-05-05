@@ -83,7 +83,6 @@ pub const TextureManager = struct {
             @floatFromInt(max_freq),
             max_screen_x,
         );
-        std.debug.print("x pos: {d}, assumed {d}\n", .{ x_pos, @mod(@max(1, max_screen_x - x_pos -| size / 2), max_screen_x) });
         const dest_rect = c.SDL_Rect{
             .x = @intCast(@mod(max_screen_x - x_pos -| size / 2, max_screen_x)), // Center the dot
             .y = @intFromFloat(amp),

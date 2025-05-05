@@ -15,10 +15,9 @@ pub const Action = enum([]InputCommand) { //starts with Keycodes.C
 const InputCommand = union(enum) {
     Key: Keycodes,
     Num: f64,
-    Range: struct { usize, usize },
+    Range: .{ usize, usize },
     Multiple: []usize,
     Str: []u8,
 };
-const std = @import("std");
 const State = @import("state.zig").InputState;
 const Keycodes = @import("sdl_keycodes.zig").SdlKeycodes;
