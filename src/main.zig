@@ -63,8 +63,8 @@ pub fn main() !void {
     const synthh = try synthes.Synthesizer(48000, chunksz);
 
     var synth = try synthh.init(alloc);
-    synth.min_freq = noteC(3);
-    synth.max_freq = noteC(5);
+    synth.min_freq = noteC(1);
+    synth.max_freq = noteC(3);
     defer synth.deinit();
 
     const TARGET_FPS = 60;
@@ -77,10 +77,10 @@ pub fn main() !void {
         1,
         1,
         0.1,
-        0.05,
+        0.01,
         0,
         1.0 / 48.0,
-        10,
+        20,
     );
     synth.state.advance();
     synth.initStream();
@@ -108,9 +108,9 @@ fn advancement(initmul: *f32, initamp: *f32, initonset: *f32, initoffset: *f32) 
     var xoro = std.Random.Xoroshiro128.init(@intCast(std.time.microTimestamp()));
     const rand = xoro.random();
     _ = rand;
-    initmul.* *= 1.5;
-    initamp.* *= 0.2;
-    initonset.* = 0.6;
+    initmul.* *= 2;
+    initamp.* *= 0.1;
+    initonset.* *= 0.9;
     initoffset.* = 0.02;
 }
 const Keycodes = @import("sdl_keycodes.zig").SdlKeycodes;
