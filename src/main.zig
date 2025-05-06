@@ -66,13 +66,18 @@ pub fn main() !void {
     synth.min_freq = noteC(3);
     synth.max_freq = noteC(5);
     defer synth.deinit();
+
+    const TARGET_FPS = 60;
+    const frame_delay = 1000 / TARGET_FPS;
+    var frame_start: u32 = c.SDL_GetTicks();
+
     try synth.genGroupWithRule(
         &keys,
         advancement,
         1,
         1,
-        0.5,
-        0.5,
+        0.1,
+        0.05,
         0,
         1.0 / 48.0,
         10,
@@ -82,6 +87,14 @@ pub fn main() !void {
     while (synth.state.currentEvent.type != c.SDL_QUIT) {
         synth.renderGuidelines();
         synth.state.advance();
+        //synth.state.is_playing_mode = !synth.state.is_playing_mode;
+        const should_pause = !synth.state.is_playing_mode;
+        c.SDL_PauseAudioDevice(synth.device, @intFromBool(should_pause));
+        const frame_time = c.SDL_GetTicks() - frame_start;
+        if (frame_time < frame_delay) {
+            c.SDL_Delay(frame_delay - frame_time);
+        }
+        frame_start = c.SDL_GetTicks();
     }
 }
 fn noteC(octave: usize) u15 {
@@ -96,9 +109,9 @@ fn advancement(initmul: *f32, initamp: *f32, initonset: *f32, initoffset: *f32) 
     const rand = xoro.random();
     _ = rand;
     initmul.* *= 1.5;
-    initamp.* *= 0.4;
+    initamp.* *= 0.2;
     initonset.* = 0.6;
-    initoffset.* = 0.2;
+    initoffset.* = 0.02;
 }
 const Keycodes = @import("sdl_keycodes.zig").SdlKeycodes;
 const State = @import("state.zig").InputState;

@@ -253,6 +253,7 @@ pub fn Synthesizer(sample_rate: comptime_int, chunk_size: comptime_int) !type {
                 self.max_freq,
             );
             @memset(output[0..chunk_size], 0.0);
+            if (!self.state.is_playing_mode) return;
             var temp_buffer: [chunk_size]f32 = undefined;
             for (self.groups.items) |*group| {
                 const is_group_active = self.state.keys_pressed[@intCast(group.key)] != 0;
